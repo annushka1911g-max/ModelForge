@@ -1,0 +1,163 @@
+version: '3.8'
+
+services:
+  # 1. Reverse Proxy & Gateway
+  nginx:
+    image: nginx:alpine
+    container_name: modelforge_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./deployment/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - modelforge-net
+
+  # 2. Frontend Web Application (React + Vite)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: modelforge_frontend
+    restart: unless-stopped
+    environment:
+      - VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost/api/v1}
+    networks:
+      - modelforge-net
+
+  # 3. Backend Core API & Serving Server (FastAPI)
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: modelforge_backend
+    restart: unless-stopped
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - DEBUG=${DEBUG:-True}
+      - APP_NAME=${APP_NAME:-ModelForge}
+      - SECRET_KEY=${SECRET_KEY}
+      - ALGORITHM=${ALGORITHM:-HS256}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
+      - POSTGRES_SERVER=${POSTGRES_SERVER:-postgres}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_USER=${POSTGRES_USER:-modelforge_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB:-modelforge_db}
+      - DATABASE_URL=${DATABASE_URL}
+      - MINIO_ENDPOINT=${MINIO_ENDPOINT:-minio:9000}
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minio_admin}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+      - MINIO_BUCKET_MODELS=${MINIO_BUCKET_MODELS:-models}
+      - MINIO_BUCKET_BATCH=${MINIO_BUCKET_BATCH:-batch-jobs}
+      - MINIO_USE_SSL=${MINIO_USE_SSL:-False}
+      - MODEL_CACHE_MAX_SIZE=${MODEL_CACHE_MAX_SIZE:-5}
+      - MODEL_STORAGE_DIR=${MODEL_STORAGE_DIR:-/tmp/modelforge/models_cache}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    networks:
+      - modelforge-net
+
+  # 4. PostgreSQL Metadata Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: modelforge_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-modelforge_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-modelforge_secure_password_placeholder}
+      POSTGRES_DB: ${POSTGRES_DB:-modelforge_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-modelforge_user} -d ${POSTGRES_DB:-modelforge_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - modelforge-net
+
+  # 5. MinIO Object Storage
+  minio:
+    image: minio/minio:RELEASE.2024-01-01T16-36-33Z
+    container_name: modelforge_minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio_admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio_secure_admin_password_placeholder}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - modelforge-net
+
+  # 6. MinIO Bucket Initialization Service (Ephemeral)
+  minio_init:
+    image: minio/mc:latest
+    container_name: modelforge_minio_init
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc alias set myminio http://minio:9000 $${MINIO_ROOT_USER:-minio_admin} $${MINIO_ROOT_PASSWORD:-minio_secure_admin_password_placeholder};
+      /usr/bin/mc mb --ignore-existing myminio/$${MINIO_BUCKET_MODELS:-models};
+      /usr/bin/mc mb --ignore-existing myminio/$${MINIO_BUCKET_BATCH:-batch-jobs};
+      echo 'MinIO buckets initialized successfully.';
+      exit 0;
+      "
+    networks:
+      - modelforge-net
+
+  # 7. Prometheus Metrics Collector
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: modelforge_prometheus
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - backend
+    networks:
+      - modelforge-net
+
+  # 8. Grafana Dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: modelforge_grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-grafana_secure_admin_password_placeholder}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+    networks:
+      - modelforge-net
+
+networks:
+  modelforge-net:
+    driver: bridge
+
+volumes:
+  pg_data:
+  minio_data:
+  grafana_data:

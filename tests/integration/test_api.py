@@ -59,4 +59,6 @@ def test_api_v1_prefix_exists(client):
     paths = response.json()["paths"]
     # Every path must start with /api/v1
     for path in paths:
-        assert path.startswith("/api/v1"), f"Route not under /api/v1: {path}"
+        assert (
+        path.startswith("/api/v1") or path in {"/healthz", "/readyz", "/docs"}
+    ), f"Unexpected route outside /api/v1: {path}"

@@ -7,7 +7,7 @@ from backend.app.models.user import UserRole
 
 def test_user_base_schema_defaults():
     """UserBase must have correct role and is_active defaults."""
-    user = UserBase(email="test@modelforge.local", full_name="Test User")
+    user = UserBase(email="test@modelforge.example", full_name="Test User")
     assert user.role == UserRole.VIEWER
     assert user.is_active is True
 
@@ -15,12 +15,12 @@ def test_user_base_schema_defaults():
 def test_user_create_schema():
     """UserCreate should accept password field."""
     user = UserCreate(
-        email="admin@modelforge.local",
+        email="admin@modelforge.example",
         full_name="Admin User",
         password="supersecret",
         role=UserRole.ADMIN,
     )
-    assert user.email == "admin@modelforge.local"
+    assert user.email == "admin@modelforge.example"
     assert user.role == UserRole.ADMIN
     assert user.password == "supersecret"
 

@@ -173,3 +173,72 @@ class BatchService:
         if deployment_id is not None:
             return self.batch_repo.get_jobs_for_deployment(deployment_id)
         return self.batch_repo.get_all_jobs(skip=skip, limit=limit)
+
+    def validate_csv(self, deployment_id: int, file_obj: BinaryIO) -> dict:
+        deployment = self.deploy_repo.get(deployment_id)
+        if not deployment:
+            raise HTTPException(status_code=404, detail="Deployment not found")
+
+        version = self.version_repo.get(deployment.current_version_id)
+        if not version:
+            raise HTTPException(status_code=404, detail="Model version not found")
+
+        schema_features = []
+        if isinstance(version.feature_schema, dict):
+            schema_features = version.feature_schema.get("features", [])
+        elif isinstance(version.feature_schema, list):
+            schema_features = version.feature_schema
+
+        required_cols = [f.get("name") for f in schema_features if isinstance(f, dict) and f.get("required", True)]
+        type_specs = {f.get("name"): f.get("type", "float") for f in schema_features if isinstance(f, dict)}
+
+        csv_bytes = file_obj.read()
+        file_obj.seek(0)
+
+        try:
+            df = pd.read_csv(io.BytesIO(csv_bytes))
+        except Exception as exc:
+            return {
+                "is_valid": False,
+                "total_rows": 0,
+                "summary": f"Could not parse CSV: {str(exc)}",
+                "missing_columns": required_cols,
+                "extra_columns": [],
+                "null_counts": {},
+                "type_errors": [f"CSV parsing error: {str(exc)}"],
+                "preview_rows": [],
+            }
+
+        total_rows = len(df)
+        missing_columns = [col for col in required_cols if col not in df.columns]
+        extra_columns = [col for col in df.columns if col not in type_specs]
+        null_counts = {col: int(df[col].isnull().sum()) for col in df.columns if df[col].isnull().sum() > 0}
+
+        type_errors = []
+        for col, expected_type in type_specs.items():
+            if col in df.columns:
+                if expected_type in ["float", "int"]:
+                    non_numeric = pd.to_numeric(df[col], errors="coerce").isnull() & df[col].notnull()
+                    invalid_count = int(non_numeric.sum())
+                    if invalid_count > 0:
+                        first_bad = df.loc[non_numeric, col].iloc[0]
+                        type_errors.append(f"Invalid: {col} has {invalid_count} non-numeric value(s) (e.g. \"{first_bad}\")")
+
+        is_valid = len(missing_columns) == 0 and len(type_errors) == 0 and total_rows > 0
+
+        summary = "Dataset is valid and ready for batch inference." if is_valid else (
+            f"Validation issues: {len(missing_columns)} missing columns, {len(type_errors)} type mismatch(es)."
+        )
+
+        preview_rows = df.head(5).to_dict(orient="records")
+
+        return {
+            "is_valid": is_valid,
+            "total_rows": total_rows,
+            "summary": summary,
+            "missing_columns": missing_columns,
+            "extra_columns": extra_columns,
+            "null_counts": null_counts,
+            "type_errors": type_errors,
+            "preview_rows": preview_rows,
+        }

@@ -21,15 +21,32 @@ class ErrorDetail(BaseModel):
 
 def http_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """
-    Handles FastAPI HTTPException.
-
-    Preserves FastAPI's standard {"detail": ...} response format
-    so clients and tests can consume HTTP errors consistently.
+    Handles FastAPI HTTPException with standardized structure
+    while preserving {"detail": ...} for backward compatibility with existing tests.
     """
     from fastapi.exceptions import HTTPException
 
     if isinstance(exc, HTTPException):
-        content = {"detail": exc.detail}
+        detail_msg = exc.detail if isinstance(exc.detail, str) else "Request error"
+        code_map = {
+            400: "BAD_REQUEST",
+            401: "UNAUTHORIZED",
+            403: "FORBIDDEN",
+            404: "NOT_FOUND",
+            409: "CONFLICT",
+            422: "UNPROCESSABLE_ENTITY",
+            429: "TOO_MANY_REQUESTS",
+            500: "INTERNAL_SERVER_ERROR",
+            501: "NOT_IMPLEMENTED",
+        }
+        code = getattr(exc, "code", code_map.get(exc.status_code, "HTTP_ERROR"))
+        content = {
+            "detail": exc.detail,
+            "status": "error",
+            "message": detail_msg,
+            "code": code,
+            "details": exc.detail if not isinstance(exc.detail, str) else None,
+        }
 
         return JSONResponse(
             status_code=exc.status_code,
@@ -39,7 +56,13 @@ def http_exception_handler(request: Request, exc: Exception) -> JSONResponse:
 
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={"detail": "Unexpected error"},
+        content={
+            "detail": "Unexpected error",
+            "status": "error",
+            "message": "An unexpected server error occurred",
+            "code": "INTERNAL_SERVER_ERROR",
+            "details": None,
+        },
     )
 
 

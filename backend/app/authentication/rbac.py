@@ -18,13 +18,25 @@ def get_current_user(
     db: Session = Depends(get_db),
 ) -> User:
     """
-    Dependency: validates JWT token and returns the current user.
+    Dependency: validates JWT token or API key and returns the current user.
+    Supports Authorization: Bearer <JWT> and Authorization: Bearer <API_KEY>.
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
+    # 1. Check for ModelForge API Key (mf_live_...)
+    if token.startswith("mf_"):
+        from backend.app.services.api_key_service import ApiKeyService
+        key_svc = ApiKeyService(db)
+        user = key_svc.verify_key(token)
+        if user is None or not user.is_active:
+            raise credentials_exception
+        return user
+
+    # 2. Check for standard JWT token
     payload = decode_access_token(token)
     if payload is None:
         raise credentials_exception

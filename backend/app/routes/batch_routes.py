@@ -21,6 +21,27 @@ router = APIRouter()
 logger = logging.getLogger("modelforge.routes.batch")
 
 
+from backend.app.services.audit_service import log_audit_event
+from backend.app.services.notification_service import create_notification
+
+
+@router.post(
+    "/{deployment_id}/validate-csv",
+    summary="Validate CSV dataset against deployment schema before submitting",
+    operation_id="validate_batch_csv",
+)
+def validate_batch_csv(
+    deployment_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles([UserRole.ADMIN, UserRole.ML_ENGINEER])),
+):
+    if not file.filename or not file.filename.endswith(".csv"):
+        raise HTTPException(status_code=400, detail="Only CSV files are accepted for validation")
+    svc = BatchService(db)
+    return svc.validate_csv(deployment_id, file.file)
+
+
 @router.post(
     "/{deployment_id}/predict-batch",
     response_model=BatchJobResponse,
@@ -37,7 +58,24 @@ def submit_batch_prediction(
     if not file.filename or not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only CSV files are accepted")
     svc = BatchService(db)
-    return svc.submit_batch_job(deployment_id, file.file, file.filename, current_user.id)
+    job = svc.submit_batch_job(deployment_id, file.file, file.filename, current_user.id)
+
+    log_audit_event(
+        db=db,
+        action="BATCH_SUBMIT",
+        resource="batch",
+        resource_id=str(job.id),
+        user=current_user,
+        metadata={"deployment_id": deployment_id, "filename": file.filename},
+    )
+    create_notification(
+        db=db,
+        title="Batch Job Completed" if job.status.value == "COMPLETED" else "Batch Job Submitted",
+        message=f"Batch job #{job.id} for deployment #{deployment_id} ({job.total_records} records) finished with status {job.status.value}.",
+        notification_type="SUCCESS" if job.status.value == "COMPLETED" else "INFO",
+        link="/batch",
+    )
+    return job
 
 
 @router.get(

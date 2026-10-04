@@ -23,6 +23,10 @@ def client():
 
     try:
         from backend.app.models.model import Model
+        from backend.app.models.api_key import ApiKey
+        from backend.app.models.audit_log import AuditLog
+        from backend.app.models.experiment import Experiment
+        from backend.app.models.notification import Notification
 
         # Remove models created by integration test suite (keep demo models)
         test_models = db.query(Model).filter(
@@ -31,10 +35,16 @@ def client():
         for model in test_models:
             db.delete(model)
 
-        # Remove users created by the integration test suite.
+        # Remove users created by the integration test suite and their related records
         users = db.query(User).filter(
             User.email.like("%@test.com")
         ).all()
+        user_ids = [u.id for u in users]
+        if user_ids:
+            db.query(ApiKey).filter(ApiKey.user_id.in_(user_ids)).delete(synchronize_session=False)
+            db.query(Notification).filter(Notification.user_id.in_(user_ids)).delete(synchronize_session=False)
+            db.query(AuditLog).filter(AuditLog.user_id.in_(user_ids)).delete(synchronize_session=False)
+            db.query(Experiment).filter(Experiment.created_by.in_(user_ids)).delete(synchronize_session=False)
 
         for user in users:
             db.delete(user)

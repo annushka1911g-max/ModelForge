@@ -3,7 +3,7 @@ SQLAlchemy Model group definition.
 """
 import enum
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, DateTime, Enum, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, DateTime, Enum, ForeignKey, Boolean, JSON
 from sqlalchemy.orm import relationship
 from backend.app.database.base import Base
 
@@ -29,6 +29,8 @@ class Model(Base):
     description = Column(Text, nullable=True)
     framework = Column(Enum(MLFramework), nullable=False, index=True)
     task_type = Column(Enum(TaskType), nullable=False)
+    tags = Column(JSON, default=list, nullable=True)
+    is_starred = Column(Boolean, default=False, nullable=False)
     created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

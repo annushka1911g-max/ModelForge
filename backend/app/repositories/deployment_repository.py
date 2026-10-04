@@ -33,6 +33,23 @@ class PredictionLogRepository(BaseRepository[PredictionLog]):
             .all()
         )
 
+    def get_all_logs(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        deployment_id: Optional[int] = None,
+        model_version_id: Optional[int] = None,
+        status_code: Optional[int] = None,
+    ) -> List[PredictionLog]:
+        query = self.db.query(PredictionLog)
+        if deployment_id is not None:
+            query = query.filter(PredictionLog.deployment_id == deployment_id)
+        if model_version_id is not None:
+            query = query.filter(PredictionLog.model_version_id == model_version_id)
+        if status_code is not None:
+            query = query.filter(PredictionLog.status_code == status_code)
+        return query.order_by(PredictionLog.created_at.desc()).offset(skip).limit(limit).all()
+
 
 class BatchJobRepository(BaseRepository[BatchJob]):
     def __init__(self, db: Session):

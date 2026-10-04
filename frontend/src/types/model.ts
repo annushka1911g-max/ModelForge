@@ -32,6 +32,8 @@ export interface Model {
   framework: MLFramework;
   task_type: TaskType;
   created_by?: number;
+  tags?: string[];
+  is_starred?: boolean;
   created_at: string;
   updated_at: string;
   versions?: ModelVersion[];

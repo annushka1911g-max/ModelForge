@@ -46,6 +46,8 @@ class ModelBase(BaseModel):
     description: Optional[str] = None
     framework: MLFramework
     task_type: TaskType
+    tags: Optional[List[str]] = []
+    is_starred: bool = False
 
 
 class ModelCreate(ModelBase):
@@ -57,6 +59,8 @@ class ModelUpdate(BaseModel):
 
     display_name: Optional[str] = None
     description: Optional[str] = None
+    tags: Optional[List[str]] = None
+    is_starred: Optional[bool] = None
 
 
 class ModelResponse(ModelBase):

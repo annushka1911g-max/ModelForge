@@ -127,3 +127,83 @@ class DeploymentService:
         if not deployment:
             raise HTTPException(status_code=404, detail="Deployment not found")
         return deployment
+
+    def get_health_metrics(self, deployment_id: int) -> dict:
+        import numpy as np
+        from backend.app.models.prediction_log import PredictionLog
+
+        deployment = self._get_deployment_or_404(deployment_id)
+        logs = (
+            self.db.query(PredictionLog)
+            .filter(PredictionLog.deployment_id == deployment_id)
+            .order_by(PredictionLog.created_at.desc())
+            .limit(500)
+            .all()
+        )
+
+        total_requests = len(logs)
+        successful = sum(1 for log in logs if log.status_code == 200)
+        failed = total_requests - successful
+
+        latencies = [log.latency_ms for log in logs if log.latency_ms is not None and log.latency_ms > 0]
+        avg_latency = float(np.mean(latencies)) if latencies else 0.0
+        p95_latency = float(np.percentile(latencies, 95)) if latencies else 0.0
+        last_prediction_at = logs[0].created_at if logs else None
+
+        if deployment.status == DeploymentStatus.STOPPED:
+            health_status = "STOPPED"
+        elif total_requests == 0:
+            health_status = "HEALTHY"
+        else:
+            failure_rate = (failed / total_requests) * 100
+            if failure_rate >= 50:
+                health_status = "FAILED"
+            elif failure_rate >= 5:
+                health_status = "DEGRADED"
+            else:
+                health_status = "HEALTHY"
+
+        return {
+            "deployment_id": deployment.id,
+            "status": deployment.status.value,
+            "health_status": health_status,
+            "request_count": total_requests,
+            "successful_requests": successful,
+            "failed_requests": failed,
+            "avg_latency_ms": round(avg_latency, 2),
+            "p95_latency_ms": round(p95_latency, 2),
+            "last_prediction_at": last_prediction_at.isoformat() if last_prediction_at else None,
+            "uptime_since": deployment.deployed_at.isoformat() if deployment.deployed_at else None,
+        }
+
+    def get_deployment_history(self, deployment_id: int) -> list:
+        from backend.app.models.audit_log import AuditLog
+
+        deployment = self._get_deployment_or_404(deployment_id)
+        logs = (
+            self.db.query(AuditLog)
+            .filter(AuditLog.resource == "deployment", AuditLog.resource_id == str(deployment_id))
+            .order_by(AuditLog.timestamp.desc())
+            .all()
+        )
+
+        history = []
+        for l in logs:
+            history.append({
+                "id": l.id,
+                "action": l.action,
+                "user_email": l.user_email or "system",
+                "timestamp": l.timestamp.isoformat(),
+                "details": l.event_metadata or {},
+            })
+
+        if not history:
+            history.append({
+                "id": 1,
+                "action": "DEPLOY",
+                "user_email": deployment.deployer.email if deployment.deployer else "system",
+                "timestamp": deployment.deployed_at.isoformat() if deployment.deployed_at else datetime.now(timezone.utc).isoformat(),
+                "details": {"version": deployment.current_version_id},
+            })
+
+        return history

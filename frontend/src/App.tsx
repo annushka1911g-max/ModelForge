@@ -14,6 +14,10 @@ import { PlaygroundPage } from './pages/PlaygroundPage';
 import { BatchPredictPage } from './pages/BatchPredictPage';
 import { MonitoringPage } from './pages/MonitoringPage';
 import { UserAdminPage } from './pages/UserAdminPage';
+import { ExperimentsPage } from './pages/ExperimentsPage';
+import { PredictionsPage } from './pages/PredictionsPage';
+import { AuditLogsPage } from './pages/AuditLogsPage';
+import { SettingsPage } from './pages/SettingsPage';
 
 export const App: React.FC = () => {
   return (
@@ -28,28 +32,33 @@ export const App: React.FC = () => {
             path="/*"
             element={
               <ProtectedRoute>
-                <div className="flex flex-col min-h-screen">
+                <div className="flex flex-col min-h-screen bg-slate-950">
                   <Navbar />
-                  <div className="flex flex-1">
+                  <div className="flex flex-1 overflow-hidden">
                     <Sidebar />
-                    <main className="flex-1 p-8 bg-slate-950 overflow-y-auto">
+                    <main className="flex-1 p-6 overflow-y-auto">
                       <Routes>
-                        <Route path="/dashboard" element={<DashboardPage />} />
-                        <Route path="/models" element={<ModelsPage />} />
-                        <Route path="/models/:id" element={<ModelDetailPage />} />
+                        <Route path="/dashboard"   element={<DashboardPage />} />
+                        <Route path="/models"      element={<ModelsPage />} />
+                        <Route path="/models/:id"  element={<ModelDetailPage />} />
                         <Route path="/deployments" element={<DeploymentsPage />} />
-                        <Route path="/playground" element={<PlaygroundPage />} />
-                        <Route path="/batch" element={<BatchPredictPage />} />
-                        <Route path="/monitoring" element={<MonitoringPage />} />
-                        <Route
-                          path="/users"
-                          element={
-                            <ProtectedRoute allowedRoles={['ADMIN']}>
-                              <UserAdminPage />
-                            </ProtectedRoute>
-                          }
-                        />
-                        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                        <Route path="/playground"  element={<PlaygroundPage />} />
+                        <Route path="/batch"       element={<BatchPredictPage />} />
+                        <Route path="/monitoring"  element={<MonitoringPage />} />
+                        <Route path="/experiments" element={<ExperimentsPage />} />
+                        <Route path="/predictions" element={<PredictionsPage />} />
+                        <Route path="/audit-logs"  element={
+                          <ProtectedRoute allowedRoles={['ADMIN', 'ML_ENGINEER']}>
+                            <AuditLogsPage />
+                          </ProtectedRoute>
+                        } />
+                        <Route path="/settings"    element={<SettingsPage />} />
+                        <Route path="/users"       element={
+                          <ProtectedRoute allowedRoles={['ADMIN']}>
+                            <UserAdminPage />
+                          </ProtectedRoute>
+                        } />
+                        <Route path="*"            element={<Navigate to="/dashboard" replace />} />
                       </Routes>
                     </main>
                   </div>

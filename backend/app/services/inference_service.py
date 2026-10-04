@@ -180,3 +180,79 @@ class InferenceService:
 
     def get_prediction_logs(self, deployment_id: int, skip: int = 0, limit: int = 100) -> List[PredictionLog]:
         return self.log_repo.get_logs_for_deployment(deployment_id, limit=limit)
+
+    def get_all_prediction_logs(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        deployment_id: Optional[int] = None,
+        model_version_id: Optional[int] = None,
+        status_code: Optional[int] = None,
+    ) -> List[PredictionLog]:
+        return self.log_repo.get_all_logs(
+            skip=skip,
+            limit=limit,
+            deployment_id=deployment_id,
+            model_version_id=model_version_id,
+            status_code=status_code,
+        )
+
+    def get_feature_importance(self, deployment_id: int) -> Dict[str, Any]:
+        deployment = self.deploy_repo.get(deployment_id)
+        if not deployment:
+            raise HTTPException(status_code=404, detail="Deployment not found")
+
+        version = self.version_repo.get(deployment.current_version_id)
+        if not version:
+            raise HTTPException(status_code=404, detail="Model version not found")
+
+        model = self.model_repo.get(deployment.model_id)
+        if not model:
+            raise HTTPException(status_code=404, detail="Model not found")
+
+        artifact_basename = os.path.basename(version.artifact_path)
+        local_dir = os.path.join(settings.MODEL_STORAGE_DIR, model.name, f"v{version.version_number}")
+        local_path = os.path.join(local_dir, artifact_basename)
+
+        try:
+            if not os.path.exists(local_path):
+                os.makedirs(local_dir, exist_ok=True)
+                self.storage.download_artifact(settings.MINIO_BUCKET_MODELS, version.artifact_path, local_path)
+        except Exception as exc:
+            logger.warning("Could not download artifact for feature importance: %s", exc)
+
+        cache_key = _model_runner._get_cache_key(deployment_id, version.id)
+        adapter = _model_runner.cache.get(cache_key)
+        if adapter is None and os.path.exists(local_path):
+            try:
+                adapter = _model_runner._load_adapter(local_path, model.framework.value)
+                _model_runner.cache.put(cache_key, adapter)
+            except Exception as exc:
+                logger.warning("Could not load adapter for feature importance: %s", exc)
+
+        feature_names = []
+        if isinstance(version.feature_schema, dict):
+            features_list = version.feature_schema.get("features", [])
+            if isinstance(features_list, list):
+                feature_names = [f.get("name") for f in features_list if isinstance(f, dict) and "name" in f]
+        elif isinstance(version.feature_schema, list):
+            feature_names = [f.get("name") for f in version.feature_schema if isinstance(f, dict) and "name" in f]
+
+        importances = adapter.get_feature_importance(feature_names) if adapter else None
+        if importances:
+            return {
+                "supported": True,
+                "model_id": model.id,
+                "model_name": model.display_name,
+                "version": version.version_number,
+                "framework": model.framework.value,
+                "features": importances,
+            }
+        return {
+            "supported": False,
+            "model_id": model.id,
+            "model_name": model.display_name,
+            "version": version.version_number,
+            "message": "Feature importance is not available for this model.",
+            "features": [],
+        }

@@ -34,3 +34,9 @@ class BaseModelAdapter(ABC):
         Executes probability estimation if supported by the model.
         """
         pass
+
+    def get_feature_importance(self, feature_names: Union[List[str], None] = None) -> Union[List[Dict[str, Any]], None]:
+        """
+        Extracts feature importances or coefficients if supported by the underlying model.
+        """
+        return None

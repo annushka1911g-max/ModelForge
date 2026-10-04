@@ -137,7 +137,22 @@ def create_application() -> FastAPI:
 app = create_application()
 
 
-# ── System-Level Health Endpoints (outside versioned prefix) ──────────────────
+# ── System-Level Health Endpoints ─────────────────────────────────────────────
+@app.get("/health", summary="Comprehensive System Health Check", include_in_schema=False)
+def health(db=Depends(get_db)):
+    """
+    Comprehensive health check validating API, Database, Storage, and Inference Engine.
+    """
+    from backend.app.core.health import get_system_health
+    return {
+        "app": settings.APP_NAME,
+        "environment": settings.ENVIRONMENT,
+        "version": "1.0.0",
+        **get_system_health(db),
+    }
+
+
+@app.get("/health/live", summary="Liveness probe", include_in_schema=False)
 @app.get("/healthz", tags=["System Health"], summary="Liveness probe")
 def liveness():
     """
@@ -151,6 +166,7 @@ def liveness():
     }
 
 
+@app.get("/health/ready", summary="Readiness probe", include_in_schema=False)
 @app.get("/readyz", tags=["System Health"], summary="Readiness probe with DB check")
 def readiness(db=Depends(get_db)):
     """

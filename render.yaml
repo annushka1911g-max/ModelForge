@@ -25,7 +25,7 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: BACKEND_CORS_ORIGINS
-        value: "*"
+        value: '["*"]'
       - key: STORAGE_BACKEND
         value: local
       - key: STORAGE_DIR

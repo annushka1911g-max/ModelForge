@@ -10,16 +10,16 @@ class PyTorchAdapter(BaseModelAdapter):
         """
         Loads PyTorch TorchScript or state_dict model on CPU.
         """
-        raise NotImplementedError("PyTorchAdapter.load to be implemented")
+        raise NotImplementedError("PyTorch framework adapter is not supported in this release")
 
     def predict(self, features: Union[Dict[str, Any], List[Dict[str, Any]]]) -> Any:
         """
         Executes torch model forward pass.
         """
-        raise NotImplementedError("PyTorchAdapter.predict to be implemented")
+        raise NotImplementedError("PyTorch framework adapter is not supported in this release")
 
     def predict_proba(self, features: Union[Dict[str, Any], List[Dict[str, Any]]]) -> Any:
         """
         Executes softmax probability calculation.
         """
-        raise NotImplementedError("PyTorchAdapter.predict_proba to be implemented")
+        raise NotImplementedError("PyTorch framework adapter is not supported in this release")

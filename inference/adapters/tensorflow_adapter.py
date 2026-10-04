@@ -10,16 +10,16 @@ class TensorFlowAdapter(BaseModelAdapter):
         """
         Loads TensorFlow SavedModel or Keras .h5 / .keras model.
         """
-        raise NotImplementedError("TensorFlowAdapter.load to be implemented")
+        raise NotImplementedError("TensorFlow framework adapter is not supported in this release")
 
     def predict(self, features: Union[Dict[str, Any], List[Dict[str, Any]]]) -> Any:
         """
         Executes TF/Keras model.predict().
         """
-        raise NotImplementedError("TensorFlowAdapter.predict to be implemented")
+        raise NotImplementedError("TensorFlow framework adapter is not supported in this release")
 
     def predict_proba(self, features: Union[Dict[str, Any], List[Dict[str, Any]]]) -> Any:
         """
         Returns prediction probabilities.
         """
-        raise NotImplementedError("TensorFlowAdapter.predict_proba to be implemented")
+        raise NotImplementedError("TensorFlow framework adapter is not supported in this release")

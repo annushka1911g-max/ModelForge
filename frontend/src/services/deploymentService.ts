@@ -3,15 +3,42 @@ import { Deployment } from '../types';
 
 export const deploymentService = {
   getDeployments: async (): Promise<Deployment[]> => {
-    throw new Error('deploymentService.getDeployments not yet implemented');
+    const response = await apiClient.get<Deployment[]>('/deployments/');
+    return response.data;
   },
-  deployVersion: async (_modelId: number, _versionId: number): Promise<Deployment> => {
-    throw new Error('deploymentService.deployVersion not yet implemented');
+
+  getDeployment: async (id: number): Promise<Deployment> => {
+    const response = await apiClient.get<Deployment>(`/deployments/${id}`);
+    return response.data;
   },
-  rollbackDeployment: async (_deploymentId: number): Promise<Deployment> => {
-    throw new Error('deploymentService.rollbackDeployment not yet implemented');
+
+  deployVersion: async (modelId: number, versionId: number): Promise<Deployment> => {
+    const response = await apiClient.post<Deployment>('/deployments/', {
+      model_id: modelId,
+      current_version_id: versionId,
+    });
+    return response.data;
   },
-  stopDeployment: async (_deploymentId: number): Promise<Deployment> => {
-    throw new Error('deploymentService.stopDeployment not yet implemented');
+
+  stopDeployment: async (deploymentId: number): Promise<Deployment> => {
+    const response = await apiClient.post<Deployment>(`/deployments/${deploymentId}/stop`);
+    return response.data;
+  },
+
+  restartDeployment: async (deploymentId: number): Promise<Deployment> => {
+    const response = await apiClient.post<Deployment>(`/deployments/${deploymentId}/restart`);
+    return response.data;
+  },
+
+  rollbackDeployment: async (deploymentId: number, targetVersionId?: number): Promise<Deployment> => {
+    const response = await apiClient.post<Deployment>(`/deployments/${deploymentId}/rollback`, {
+      target_version_id: targetVersionId ?? null,
+    });
+    return response.data;
+  },
+
+  getDeploymentHealth: async (deploymentId: number): Promise<any> => {
+    const response = await apiClient.get(`/deployments/${deploymentId}/health`);
+    return response.data;
   },
 };

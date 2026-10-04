@@ -6,6 +6,7 @@ from backend.app.schemas.user_schema import (
     UserCreate,
     UserUpdate,
     UserResponse,
+    LoginRequest,
     Token,
     TokenPayload,
 )
@@ -39,6 +40,7 @@ __all__ = [
     "UserCreate",
     "UserUpdate",
     "UserResponse",
+    "LoginRequest",
     "Token",
     "TokenPayload",
     "FeatureSpec",

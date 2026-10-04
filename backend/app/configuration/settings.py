@@ -54,7 +54,10 @@ class Settings(BaseSettings):
         auth = f"{user}:{password}" if password else user
         return f"postgresql://{auth}@{server}:{port}/{db}"
 
-    # MinIO Object Storage
+    # Artifact Object Storage
+    STORAGE_BACKEND: str = "local"
+    STORAGE_DIR: str = "./storage"
+  
     MINIO_ENDPOINT: str = "localhost:9000"
     MINIO_ROOT_USER: str = "minio_admin"
     MINIO_ROOT_PASSWORD: str = "minio_secure_admin_password_placeholder"

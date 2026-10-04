@@ -8,6 +8,8 @@ from backend.app.models.deployment import DeploymentStatus
 
 
 class DeploymentBase(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     model_id: int
     current_version_id: int
 
@@ -17,6 +19,8 @@ class DeploymentCreate(DeploymentBase):
 
 
 class DeploymentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
     id: int
     model_id: int
     current_version_id: int
@@ -27,8 +31,6 @@ class DeploymentResponse(BaseModel):
     deployed_at: datetime
     last_rollback_at: Optional[datetime] = None
     updated_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)
 
 
 class RollbackRequest(BaseModel):

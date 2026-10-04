@@ -1,45 +1,108 @@
 """
 Batch prediction API routes.
 """
-from fastapi import APIRouter, Depends, UploadFile, File, status
+import io
+import logging
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
+
+from backend.app.authentication.rbac import require_roles
+from backend.app.configuration.settings import settings
 from backend.app.database.session import get_db
-from backend.app.schemas.batch_schema import BatchJobResponse
-from backend.app.authentication.rbac import get_current_user, require_roles
 from backend.app.models.user import User, UserRole
+from backend.app.schemas.batch_schema import BatchJobResponse
+from backend.app.services.batch_service import BatchService
+from backend.app.services.storage_service import StorageService
 
 router = APIRouter()
+logger = logging.getLogger("modelforge.routes.batch")
 
 
 @router.post(
     "/{deployment_id}/predict-batch",
     response_model=BatchJobResponse,
     status_code=status.HTTP_202_ACCEPTED,
-    dependencies=[Depends(require_roles([UserRole.ADMIN, UserRole.ML_ENGINEER]))],
+    summary="Submit batch CSV for prediction",
+    operation_id="submit_batch",
 )
 def submit_batch_prediction(
     deployment_id: int,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles([UserRole.ADMIN, UserRole.ML_ENGINEER])),
 ):
-    """
-    Submit a CSV file for asynchronous batch prediction.
-    """
-    raise NotImplementedError("Batch prediction submission to be implemented")
+    if not file.filename or not file.filename.endswith(".csv"):
+        raise HTTPException(status_code=400, detail="Only CSV files are accepted")
+    svc = BatchService(db)
+    return svc.submit_batch_job(deployment_id, file.file, file.filename, current_user.id)
 
 
-@router.get("/jobs/{job_id}", response_model=BatchJobResponse)
+@router.get(
+    "/jobs",
+    response_model=List[BatchJobResponse],
+    summary="List batch prediction jobs",
+    operation_id="list_batch_jobs",
+)
+def list_batch_jobs(
+    deployment_id: Optional[int] = None,
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+):
+    svc = BatchService(db)
+    return svc.list_jobs(deployment_id=deployment_id, skip=skip, limit=limit)
+
+
+@router.get(
+    "/{deployment_id}/jobs",
+    response_model=List[BatchJobResponse],
+    summary="List batch prediction jobs for a deployment",
+    operation_id="list_deployment_batch_jobs",
+)
+def list_deployment_batch_jobs(
+    deployment_id: int,
+    db: Session = Depends(get_db),
+):
+    svc = BatchService(db)
+    return svc.get_jobs_for_deployment(deployment_id)
+
+
+@router.get(
+    "/jobs/{job_id}",
+    response_model=BatchJobResponse,
+    summary="Get batch job status",
+    operation_id="get_batch_status",
+)
 def get_batch_job_status(job_id: int, db: Session = Depends(get_db)):
-    """
-    Check the status and progress of a batch prediction job.
-    """
-    raise NotImplementedError("Batch job status endpoint to be implemented")
+    svc = BatchService(db)
+    return svc.get_job_status(job_id)
 
 
-@router.get("/jobs/{job_id}/download")
+@router.get(
+    "/jobs/{job_id}/download",
+    summary="Download batch results CSV",
+    operation_id="download_batch_results",
+)
 def download_batch_results(job_id: int, db: Session = Depends(get_db)):
-    """
-    Download the processed CSV containing predictions.
-    """
-    raise NotImplementedError("Batch download endpoint to be implemented")
+    svc = BatchService(db)
+    job = svc.get_job_status(job_id)
+    if not job.output_file_url:
+        raise HTTPException(status_code=404, detail="Results not yet available")
+
+    storage = StorageService()
+    try:
+        content = storage.read_artifact(settings.MINIO_BUCKET_BATCH, job.output_file_url)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Batch results artifact not found")
+    except Exception as exc:
+        logger.error("Failed to read batch results artifact: %s", exc)
+        raise HTTPException(status_code=500, detail="Failed to retrieve batch results")
+
+    return StreamingResponse(
+        io.BytesIO(content),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=results_{job_id}.csv"},
+    )

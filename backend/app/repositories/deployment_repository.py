@@ -45,3 +45,12 @@ class BatchJobRepository(BaseRepository[BatchJob]):
             .order_by(BatchJob.created_at.desc())
             .all()
         )
+
+    def get_all_jobs(self, skip: int = 0, limit: int = 100) -> List[BatchJob]:
+        return (
+            self.db.query(BatchJob)
+            .order_by(BatchJob.created_at.desc())
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )

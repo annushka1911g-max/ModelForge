@@ -11,6 +11,8 @@ class PredictionRequest(BaseModel):
 
 
 class PredictionResponse(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     prediction: Union[List[Any], Any]
     probabilities: Optional[List[float]] = None
     model_version: int
@@ -19,6 +21,8 @@ class PredictionResponse(BaseModel):
 
 
 class PredictionLogResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
     id: int
     deployment_id: int
     model_version_id: int
@@ -29,5 +33,3 @@ class PredictionLogResponse(BaseModel):
     error_message: Optional[str] = None
     client_ip: Optional[str] = None
     created_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)

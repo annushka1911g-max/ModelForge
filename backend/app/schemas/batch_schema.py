@@ -12,6 +12,8 @@ class BatchJobCreate(BaseModel):
 
 
 class BatchJobResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
     id: int
     deployment_id: int
     model_version_id: int
@@ -25,4 +27,3 @@ class BatchJobResponse(BaseModel):
     created_at: datetime
     completed_at: Optional[datetime] = None
 
-    model_config = ConfigDict(from_attributes=True)

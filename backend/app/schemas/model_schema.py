@@ -16,11 +16,13 @@ class FeatureSpec(BaseModel):
 
 
 class ModelVersionBase(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     version_number: int
     artifact_path: str
     file_hash: str
     file_size_bytes: int
-    feature_schema: List[Dict[str, Any]]
+    feature_schema:Dict[str, Any]
     target_schema: Optional[Dict[str, Any]] = None
     training_metrics: Optional[Dict[str, Any]] = None
     status: VersionStatus = VersionStatus.READY
@@ -28,15 +30,17 @@ class ModelVersionBase(BaseModel):
 
 
 class ModelVersionResponse(ModelVersionBase):
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
     id: int
     model_id: int
     created_by: Optional[int] = None
     created_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
-
 
 class ModelBase(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     name: str
     display_name: str
     description: Optional[str] = None
@@ -49,15 +53,17 @@ class ModelCreate(ModelBase):
 
 
 class ModelUpdate(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     display_name: Optional[str] = None
     description: Optional[str] = None
 
 
 class ModelResponse(ModelBase):
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
     id: int
     created_by: Optional[int] = None
     created_at: datetime
     updated_at: datetime
     versions: List[ModelVersionResponse] = []
-
-    model_config = ConfigDict(from_attributes=True)

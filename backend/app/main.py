@@ -49,12 +49,47 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     except Exception as exc:
         logger.error("✗ Database connection FAILED on startup: %s", exc, exc_info=True)
 
+    # Initialize artifact storage
+    try:
+        from backend.app.services.storage_service import StorageService
+        storage = StorageService()
+        storage.ensure_buckets()
+        logger.info("✓ Artifact storage initialized.")
+    except Exception as exc:
+        logger.warning("Artifact storage initialization failed: %s", exc)
+
+    # Ensure default users and demo accounts exist
+    try:
+        from backend.app.database.seed import seed_database
+        seed_database()
+        logger.info("✓ Default demo users verified.")
+    except Exception as exc:
+        logger.warning("Default user seeding skipped: %s", exc)
+
+    # Register custom Prometheus metrics
+    try:
+        from prometheus_client import Counter, Histogram, Gauge
+        app.state.prom_prediction_count = Counter(
+            "modelforge_predictions_total", "Total predictions served", ["deployment_id", "status"]
+        )
+        app.state.prom_prediction_latency = Histogram(
+            "modelforge_prediction_latency_ms", "Prediction latency in milliseconds",
+            buckets=[1, 5, 10, 25, 50, 100, 250, 500, 1000, 5000],
+        )
+        app.state.prom_active_deployments = Gauge(
+            "modelforge_active_deployments", "Number of active deployments"
+        )
+        logger.info("✓ Prometheus metrics registered.")
+    except Exception as exc:
+        logger.warning("Prometheus metrics registration failed: %s", exc)
+
     yield
 
     # ── Shutdown ─────────────────────────────────────────────────────────────
     logger.info("ModelForge Backend shutting down — disposing DB connection pool...")
     engine.dispose()
     logger.info("Shutdown complete.")
+
 
 
 # ── Application Factory ───────────────────────────────────────────────────────

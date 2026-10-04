@@ -16,6 +16,8 @@ services:
         fromDatabase:
           name: modelforge-db
           property: connectionString
+      - key: PYTHON_VERSION
+        value: "3.12.0"
       - key: ENVIRONMENT
         value: production
       - key: DEBUG

@@ -44,6 +44,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
             result = conn.execute(text("SELECT 1")).scalar()
         if result == 1:
             logger.info("✓ Database connection verified successfully.")
+            # Automatically create tables if not present (for fresh cloud database deploys like Render/Neon/Supabase)
+            try:
+                from backend.app.database.base import Base
+                import backend.app.models  # noqa: F401
+                Base.metadata.create_all(bind=engine)
+                logger.info("✓ Database schema verified / initialized.")
+            except Exception as schema_err:
+                logger.warning("Database schema initialization notice: %s", schema_err)
         else:
             logger.error("✗ Database connectivity check returned unexpected result.")
     except Exception as exc:

@@ -1,0 +1,57 @@
+# Render Blueprint Specification for ModelForge
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  # ── ModelForge Backend Web Service (FastAPI) ───────────────────────────────
+  - type: web
+    name: modelforge-backend
+    runtime: python
+    region: oregon
+    plan: free
+    buildCommand: pip install --upgrade pip && pip install -r backend/requirements.txt
+    startCommand: uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /healthz
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: modelforge-db
+          property: connectionString
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: BACKEND_CORS_ORIGINS
+        value: "*"
+      - key: STORAGE_BACKEND
+        value: local
+      - key: STORAGE_DIR
+        value: ./storage
+      - key: PYTHONPATH
+        value: .
+
+  # ── ModelForge Frontend Static Site (React + Vite) ─────────────────────────
+  - type: web
+    name: modelforge-frontend
+    runtime: static
+    region: oregon
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_BASE_URL
+        # Replace with your backend web service URL once provisioned
+        # e.g., https://modelforge-backend.onrender.com/api/v1
+        value: https://modelforge-backend.onrender.com/api/v1
+
+databases:
+  # ── Managed PostgreSQL Database ────────────────────────────────────────────
+  - name: modelforge-db
+    plan: free
+    databaseName: modelforge_db
+    user: modelforge_user

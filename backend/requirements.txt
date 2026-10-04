@@ -20,9 +20,12 @@ bcrypt==4.1.2
 # Object Storage (MinIO / S3)
 boto3==1.34.69
 
-# Data Processing & Utilities
+# Data Processing, ML Serving & Utilities
 numpy>=1.26.0
 pandas>=2.2.0
+scikit-learn>=1.4.0
+joblib>=1.3.0
+xgboost>=2.0.0
 
 # Monitoring & Metrics
 prometheus-fastapi-instrumentator==7.0.0

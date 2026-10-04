@@ -1,0 +1,2 @@
+# Root requirements redirecting to backend/requirements.txt for cloud platform builds (Render, Railway, Fly.io)
+-r backend/requirements.txt

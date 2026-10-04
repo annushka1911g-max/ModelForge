@@ -32,6 +32,20 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5173",
     ]
 
+    @field_validator("BACKEND_CORS_ORIGINS", mode="before")
+    def assemble_cors_origins(cls, v) -> List[str]:
+        if isinstance(v, str):
+            if v.strip() == "*":
+                return ["*"]
+            if v.startswith("[") and v.endswith("]"):
+                import json
+                try:
+                    return json.loads(v)
+                except Exception:
+                    pass
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
+        return v
+
     # PostgreSQL Database
     POSTGRES_SERVER: str = "localhost"
     POSTGRES_PORT: int = 5432
@@ -43,6 +57,9 @@ class Settings(BaseSettings):
     @field_validator("DATABASE_URL", mode="before")
     def assemble_db_connection(cls, v: Optional[str], info) -> str:
         if isinstance(v, str) and v.strip():
+            # Render / Heroku compatibility: SQLAlchemy requires postgresql://
+            if v.startswith("postgres://"):
+                return v.replace("postgres://", "postgresql://", 1)
             return v
         values = info.data
         user = values.get("POSTGRES_USER", "postgres")
